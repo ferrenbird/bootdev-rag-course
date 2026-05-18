@@ -157,3 +157,5 @@ class InvertedIndex:
                 self.term_frequencies = pickle.load(f_termfreq)
             except FileNotFoundError:
                 print("Error: The specified file was not found.")
+            except Exception as e:
+                print("Error: {e}")

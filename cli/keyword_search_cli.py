@@ -3,7 +3,7 @@ import json
 import math
 
 from lib.inverted_index import InvertedIndex
-from lib.utils import bm25_idf_command
+from lib.utils import bm25_idf_command, search_for_args
 from lib.sanitizer import sanitizer
 
 def main() -> None:
@@ -61,8 +61,6 @@ def main() -> None:
             # Finds term frequency for a given term in the specified document.
             # If the term doesn't exist in that document, it should print "0".
             
-            # TODO: Move the logic of this case to utils.py?
-            
             print(f"Counting {args.term} across document #{args.doc_id}")
             db = load_dataset()
             try:
@@ -74,7 +72,6 @@ def main() -> None:
         
         case "idf":
             # Calculate the IDF for a given term
-            
             db = load_dataset()
             
             try:
@@ -89,35 +86,9 @@ def main() -> None:
             # Calculate BM25 Inverse Document frequency
             bm25idf = bm25_idf_command(args.term)
             print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
-
-        case "search":
-            # Perform the search
-            print(f"Searching for: {args.query}")
-            
-            # Scan through movies
-            movie_counter = 0
-            
-            # We're now going to use our InvertedIndex data set via load()
-            db = load_dataset()
-            
-            sanitized_search_arg_tokens = sanitizer(args.query, stopwords)
-            results = []
-            for token in sanitized_search_arg_tokens:
-                try:
-                    results.extend(db.get_documents(token))
-                    if len(results) > 5:
-                        break
-                except Exception as e:
-                    print(f"Unable to find")
-
-            for result in results:
-                movie_counter += 1
-                print(f"{db.docmap[result]['id']}. {db.docmap[result]['title']}")
-                if movie_counter == 5:
-                    break 
                 
         case "tfidf":
-            # TODO: Move the logic of this case to utils.py
+            # TODO: Move the logic of this case to utils.py?
             # It should take a document ID and a term as arguments.
             # It should print the term frequency for that term in the document with the given ID.
             # If the term doesn't exist in that document, it should print "0".
@@ -135,10 +106,26 @@ def main() -> None:
             except Exception as e:
                 print(f"Exception encountered: {e}")
                 
-        
+        case "search":
+            # Perform the search
+            print(f"Searching for: {args.query}")
+            
+            # We're now going to use our InvertedIndex data set via load()
+            db = load_dataset()
+            
+            # Moving logic to new method in utils
+            results = search_for_args(args.query)
+            
+            # Scan through movies
+            movie_counter = 0
+            for result in results:
+                movie_counter += 1
+                print(f"{db.docmap[result]['id']}. {db.docmap[result]['title']}")
+                if movie_counter == 5:
+                    break 
+
         case _:
             parser.print_help()
-            
 
 def load_dataset():
     # Returns dataset
@@ -148,8 +135,7 @@ def load_dataset():
         return db
     except Exception as e:
         print(f"Exception encountered: {e}")
-        return 
-
+        return
 
 if __name__ == "__main__":
     main()
