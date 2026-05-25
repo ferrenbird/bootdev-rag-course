@@ -112,8 +112,8 @@ def main() -> None:
             print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
                 
         case "tfidf":
+            # Calculates the TFxIDF value for a given term in a given document
             # It should take a document ID and a term as arguments.
-            # It should print the term frequency for that term in the document with the given ID.
             # If the term doesn't exist in that document, it should print "0".
             print(f"Counting {args.term} across document #{args.doc_id}")
             db = load_dataset()
@@ -131,6 +131,7 @@ def main() -> None:
                 
         case "bm25tf":
             # Calculate BM25 Inverse Document frequency
+            # Pass in the terms raw - we'll process later
             bm25tf = bm25_tf_command(args.doc_id, args.term, args.k1, args.b)
             print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25tf:.2f}")
                 
@@ -141,7 +142,7 @@ def main() -> None:
             # We're now going to use our InvertedIndex data set via load()
             db = load_dataset()
             
-            # Moving logic to new method in utils
+            # Pass in the terms raw - we'll process later
             results = search_for_args(args.query)
             
             # Scan through movies
@@ -154,8 +155,14 @@ def main() -> None:
                 
         case "bm25search":
             db = load_dataset()
-            results = bm25()
-            pass
+            
+            # Pass in the terms raw - we'll process later
+            results = db.bm25_search(args.query, args.limit)
+            i = 1
+            for result in results:
+                print(f"{i}. ({db.docmap[result]['id']}) {db.docmap[result]['title']} - Score: {results[result]:.2f}")
+                i += 1
+            return
 
         case _:
             parser.print_help()

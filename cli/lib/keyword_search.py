@@ -16,7 +16,7 @@ class InvertedIndex:
         
         with open('data/stopwords.txt', 'r') as file:
             stopwords = file.read().splitlines()
-        self.stopwords = stopwords
+        self.stopwords = [word.lower() for word in stopwords]
         
         with open('data/movies.json', 'r') as file:
             dataset = json.load(file)
@@ -25,13 +25,17 @@ class InvertedIndex:
         self.term_frequencies: dict[int, Counter] = {} 
         self.doc_lengths = defaultdict()
         self.doc_lengths_path = os.path.join(CACHE_DIR, "doc_lengths.pkl")
-        
-        
+    
+    
+    # =============================================
+    # =============== Core functions ==============
+    # =============================================
+    
     def __add_document(self, doc_id: int, text: str) -> None:
         """Tokenize the input text, then add each token to the index with the document ID.
         """
         
-        tokenized_words = sanitizer(text, self.stopwords)
+        tokenized_words = sanitizer(text)
         self.term_frequencies[doc_id] = Counter()
 
         # Count total number of terms per document
@@ -44,75 +48,6 @@ class InvertedIndex:
             token_counter = self.term_frequencies[doc_id] 
             token_counter.update([token])
             self.term_frequencies[doc_id] = token_counter
-            
-    def __get_avg_doc_length(self) -> float:
-        sum_words = 0
-        if len(self.docmap) == 0:
-            return 0.0
-        for i in self.doc_lengths:
-            sum_words += self.doc_lengths[i]
-        return sum_words / len(self.docmap)
-
-    
-    def get_documents(self, term) -> list[int]:
-        """ Get the set of document IDs for a given token,
-        and return them as a list, sorted in ascending order
-            
-        Keyword arguments:
-        term: string, single word/token
-        
-        """
-        # Start by getting the set of document IDs for a given token
-        doc_ids = self.index.get(term, set())
-        return sorted(list(doc_ids))
-    
-    def get_tf(self, doc_id, term):
-        # Returns the times the token appears in the document with the given ID.
-        # If the term doesn't exist in that document, return 0
-        try:
-            return self.term_frequencies[doc_id][term]
-        except Exception as e:
-            print(f"Error counting term: {e}")
-            return 0
-        
-    def get_idf(self, term):
-        # Returns the inverse document frequency.
-        
-        total_doc_count = len(self.docmap)
-        sanitized_term = sanitizer(term, self.stopwords)
-        term_match_doc_count = len(self.index[sanitized_term[0]])
-        
-        # Calculate the IDF
-        idf = math.log((total_doc_count + 1) / (term_match_doc_count + 1))
-        return idf
-
-    def get_bm25_idf(self, term: str) -> float:
-        # Calculates a more stable IDF value via the Okapi BM25 algorithm
-        tokenized_term_array = sanitizer(term, self.stopwords)
-        if len(tokenized_term_array) != 1:
-            raise Exception
-        tokenized_term = tokenized_term_array[0]
-        
-        df = len(self.get_documents(tokenized_term))
-        N = len(self.docmap)
-        IDF = math.log((N - df + 0.5) / (df + 0.5) + 1)
-        return IDF
-    
-    def get_bm25_tf(self, doc_id, term, k1=BM25_K1, b=BM25_B):
-        raw_term_frequency = self.get_tf(doc_id, term)
-        length_norm = 1 - b + b * (self.doc_lengths[doc_id] / self.__get_avg_doc_length())
-        # saturated_tf = (raw_term_frequency * (k1 + 1)) / (raw_term_frequency + k1)
-        base_tf = self.get_tf(doc_id, term)
-        tf_component = (base_tf * (k1 + 1)) / (base_tf + k1 * length_norm)
-        return tf_component
-    
-    def bm25_search(self, query, limit):
-        tokens = sanitizer(query, self.stopwords)
-        scores_dir = dict()
-        for document in self.index:
-            pass
-        pass
-    
     def build(self):
         # Build our cache folder
         for movie in self.movies:
@@ -176,12 +111,116 @@ class InvertedIndex:
                 print("Error: The specified file was not found.")
             except Exception as e:
                 print("Error opening doc_lengths.pkl: {e}")
+            
+    def __get_avg_doc_length(self) -> float:
+        sum_words = 0
+        if len(self.docmap) == 0:
+            return 0.0
+        for i in self.doc_lengths:
+            sum_words += self.doc_lengths[i]
+        return sum_words / len(self.docmap)
+
+    
+    def get_documents(self, term) -> list[int]:
+        """ Get the set of document IDs for a given token,
+        and return them as a list, sorted in ascending order
+            
+        Keyword arguments:
+        term: string, single word/token
+        
+        """
+        # Start by getting the set of document IDs for a given token
+        doc_ids = self.index.get(term, set())
+        return sorted(list(doc_ids))
+    
+    # =============================================
+    # ============= Scoring Components ============
+    # =============================================
+    
+    def get_tf(self, doc_id, term):
+        # Returns the times the token appears in the document with the given ID.
+        # If the term doesn't exist in that document, return 0
+        try:
+            return self.term_frequencies[doc_id][term]
+        except Exception as e:
+            print(f"Error counting term: {e}")
+            return 0
+        
+    def get_idf(self, term):
+        # Returns the inverse document frequency.
+        
+        total_doc_count = len(self.docmap)
+        sanitized_term = sanitizer(term)
+        term_match_doc_count = len(self.index[sanitized_term[0]])
+        
+        # Calculate the IDF
+        idf = math.log((total_doc_count + 1) / (term_match_doc_count + 1))
+        return idf
+
+    def get_bm25_tf(self, doc_id, term, k1=BM25_K1, b=BM25_B):
+        # Note, `term` should already be tokenized here!
+        raw_term_frequency = self.get_tf(doc_id, term)
+        length_norm = 1 - b + b * (self.doc_lengths[doc_id] / self.__get_avg_doc_length())
+        base_tf = self.get_tf(doc_id, term)
+        tf_component = (base_tf * (k1 + 1)) / (base_tf + k1 * length_norm)
+        return tf_component
+    
+    def get_bm25_idf(self, term: str) -> float:
+        # Calculates a more stable IDF value via the Okapi BM25 algorithm
+        # NOTE: `term` should be tokenized by this point!
+        
+        # tokenized_term_array = sanitizer(term)
+        
+        # if len(tokenized_term_array) != 1:
+            # raise Exception
+        # tokenized_term = tokenized_term_array[0]
+        
+        df = len(self.get_documents(term))
+        N = len(self.docmap)
+        IDF = math.log((N - df + 0.5) / (df + 0.5) + 1)
+        return IDF
+
+    # =============================================
+    # ============= Scoring Components ============
+    # =============================================
+    
+    def bm25_search(self, query, limit):
+        '''
+        
+        Calculates the `bm25` scores across all documents for a given query, then returns the top <limit> documents
+        
+        Inputs
+            - query: string containing term(s) to tokenize and calculate the bm25 values of
+            - limit: number of docs we should return
+            
+        '''
+        # print(f"DEBUG: query={query!r}, limit={limit!r}")
+        tokens = sanitizer(query)
+        # print(f"DEBUG: tokens={tokens!r}")
+
+        scores_dir = dict()
+        # For each document in the index, calculate the total BM25 score
+        for document in self.docmap:
+            doc_total_bm25 = 0
+            for token in tokens:
+                # For each query token, add the BM25 score to the document's running total.
+                # bm25_value = bm25(document, token)
+                bm25_tf = self.get_bm25_tf(document, token, k1=BM25_K1, b=BM25_B)
+                bm25_idf = self.get_bm25_idf(token)
+                bm25_value = bm25_tf * bm25_idf
+                doc_total_bm25 += bm25_value
+            scores_dir[document] = doc_total_bm25
+            
+        sorted_scores_dir = {key: value for key, 
+            value in sorted(scores_dir.items(), 
+                key=lambda item: item[1], reverse=True)[:limit]}
+        return sorted_scores_dir
                 
 
 def search_for_args(query):
     db = InvertedIndex()
     db.load()
-    sanitized_search_arg_tokens = sanitizer(query, db.stopwords)
+    sanitized_search_arg_tokens = sanitizer(query)
     results = []
     for token in sanitized_search_arg_tokens:
         try:
@@ -202,8 +241,8 @@ def bm25_idf_command(term: str) -> float:
 def bm25_tf_command(doc_id: int, term: str, k1, b):
     db = InvertedIndex()
     db.load()
-    sanitized_term = sanitizer(term, db.stopwords)
-    bm25tf = db.get_bm25_tf(doc_id, sanitized_term[0], k1, b)
+    # Pass in the raw, untokenized term - we'll tokenize later
+    bm25tf = db.get_bm25_tf(doc_id, term, k1, b)
     return bm25tf
 
 def bm25(doc_id: int, term: str):

@@ -1,7 +1,8 @@
 import string
 from nltk.stem import PorterStemmer
+from constants import *
 
-def sanitizer(input, stopwords) -> list[str]:
+def sanitizer(input) -> list[str]:
     """Use this function to perform a series of sanitization steps.
     
     Limits complexity in the main search function.
@@ -13,23 +14,27 @@ def sanitizer(input, stopwords) -> list[str]:
     sanatized_input -- a list of sanitized strings
     
     """
-    # First, make a punctuation translate table with maketrans()
-    punct_dict = {}
-    for char in string.punctuation:
-        punct_dict[char] = ''
-        
-    # Then, use that dictionary to create a translation table (to remove punctuation)
-    punct_table = str.maketrans(punct_dict)
+    # Start by converting everything to lowercase:
+    input = input.lower()
     
-    # Then use this translate table in translate()
-    sanitized_input = input.translate(punct_table).split()
-    
-    # Convert all strings in list to lowercase
-    sanitized_input = [input.lower() for input in sanitized_input]
+    # Remove punctuation
+    nopunct_lower_terms = input.translate(str.maketrans("", "", string.punctuation)).split()
     
     # Remove any stopwords & convert to stem
     stemmer = PorterStemmer()
-    sanitized_input = [stemmer.stem(item) for item in sanitized_input if item not in stopwords]
+    sanitized_input = [stemmer.stem(item) for item in nopunct_lower_terms if item not in STOPWORDS]
     
     # Return sanitized list
     return sanitized_input
+
+
+def load_stopwords() -> list[str]:
+    with open(STOPWORDS_PATH, "r") as f:
+        return [preprocess_text(word) for word in f.read().splitlines()]
+
+def preprocess_text(text: str) -> str:
+    text = text.lower()
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    return text
+
+STOPWORDS = load_stopwords()
