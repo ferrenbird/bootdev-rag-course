@@ -55,6 +55,7 @@ def main() -> None:
     bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")
     bm25_tf_parser.add_argument("b", type=float, nargs='?', default=BM25_B, help="Tunable BM25 b parameter")
 
+    # BM25 Search Parser
     bm25search_parser = subparsers.add_parser(
         "bm25search", help="Search movies using full BM25 scoring"
     )
@@ -62,9 +63,6 @@ def main() -> None:
     bm25search_parser.add_argument("limit", type=int, nargs='?', default=5, help="Max number of movies to return")
 
     args = parser.parse_args()
-    
-    with open('data/stopwords.txt', 'r') as file:
-        stopwords = file.read().splitlines()
 
     match args.command:
         case "build":
