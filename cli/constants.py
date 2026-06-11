@@ -6,3 +6,5 @@ CACHE_DIR = "cache/"
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 STOPWORDS_PATH = os.path.join(PROJECT_ROOT, "data", "stopwords.txt")
+
+EMBEDDINGS_PATH = os.path.join(PROJECT_ROOT, CACHE_DIR, "movie_embeddings.npy")
